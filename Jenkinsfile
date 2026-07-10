@@ -17,24 +17,18 @@ spec:
         - sleep
       args:
         - 99d
+    - name: git
+      image: alpine/git
+      command:
+        - sleep
+      args:
+        - 99d
 """
     }
   }
 
-  // Тригериться на кожен push у репозиторій. Потребує GitHub webhook,
-  // що вказує на <JENKINS_URL>/github-webhook/ (Jenkins GitHub plugin
-  // може зареєструвати його автоматично, якщо в Manage Jenkins ->
-  // System -> GitHub заданий сервер із github-token credential).
-  triggers {
-    githubPush()
-  }
-
   environment {
-    // TODO: підставити реальний ECR registry (наприклад
-    // 123456789012.dkr.ecr.us-west-2.amazonaws.com), створений у infra-репозиторії.
-    ECR_REGISTRY = "REPLACE_ME.dkr.ecr.REPLACE_ME.amazonaws.com"
-    IMAGE_NAME   = "django-app-ci"
-    IMAGE_TAG    = "${env.GIT_COMMIT ?: 'latest'}"
+    IMAGE_TAG = "v1.0.${BUILD_NUMBER}"
   }
 
   stages {
@@ -50,6 +44,28 @@ spec:
               --insecure \\
               --skip-tls-verify
           '''
+        }
+      }
+    }
+
+    stage('Update Chart Tag in Git') {
+      steps {
+        container('git') {
+          withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PAT')]) {
+            sh '''
+              git clone https://$GIT_USERNAME:$GIT_PAT@${INFRA_REPO_URL#https://} infra
+              cd infra/$CHART_PATH
+
+              sed -i "s/tag: .*/tag: $IMAGE_TAG/" values.yaml
+
+              git config user.email "$GIT_COMMIT_EMAIL"
+              git config user.name "$GIT_COMMIT_NAME"
+
+              git add values.yaml
+              git commit -m "Update image tag to $IMAGE_TAG"
+              git push origin HEAD:$INFRA_REPO_BRANCH
+            '''
+          }
         }
       }
     }
