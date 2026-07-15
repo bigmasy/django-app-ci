@@ -17,12 +17,26 @@ spec:
         - sleep
       args:
         - 99d
+      resources:
+        requests:
+          memory: "400Mi"
+          cpu: "200m"
+        limits:
+          memory: "768Mi"
+          cpu: "500m"
     - name: git
       image: alpine/git
       command:
         - sleep
       args:
         - 99d
+      resources:
+        requests:
+          memory: "32Mi"
+          cpu: "50m"
+        limits:
+          memory: "64Mi"
+          cpu: "100m"
 """
     }
   }
